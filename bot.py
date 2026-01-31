@@ -156,10 +156,12 @@ def main():
 
     scheduler = BackgroundScheduler(timezone=TIMEZONE)
     scheduler.add_job(
-        lambda: app.create_task(cleanup_messages(app)),
-        trigger="interval",
-        hours=1,   # প্রতি ঘন্টায় check করবে, কিন্তু delete হবে ২৪ ঘন্টা হলে
-    )
+    lambda: app.create_task(cleanup_messages(app)),
+    trigger="cron",
+    hour=0,
+    minute=0,
+    timezone=TIMEZONE,  # Asia/Dhaka
+)
     scheduler.start()
 
     print("🤖 Production bot started (BD Timezone)")
