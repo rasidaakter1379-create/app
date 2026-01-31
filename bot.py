@@ -1,5 +1,4 @@
 import os
-import asyncio
 import logging
 from telegram import Update
 from telegram.ext import (
@@ -9,7 +8,7 @@ from telegram.ext import (
     CommandHandler,
     filters,
 )
-from apscheduler.schedulers.asyncio import AsyncIOScheduler
+from apscheduler.schedulers.background import BackgroundScheduler
 
 logging.basicConfig(level=logging.INFO)
 
@@ -20,12 +19,10 @@ MESSAGES = {}        # chat_id -> [(chat_id, message_id)]
 ENABLED_GROUPS = set()
 
 ANNOUNCEMENT_TEXT = (
-    """সবাইকে ধন্যবাদ, এখানে আপনার মা, বোন, আন্টি, প্রতিবেশী, শালী এর সাথে যদি কিছু করার ইচ্ছা থাকে।
-    এবং করতে পারেন তাহলে সবার সাথে শেয়ার করবেন।এবং কোন পন্থা অবলম্বন করেছেন তাও বলবেন যাতে অন্য
-    কেউ উপকৃত হয়্ছে।
-    যেকোনো উপকারী তথ্য, অভিজ্ঞতা বা পরামর্শ শেয়ার করলে সবাই উপকৃত হবে।"""
+     """সবাইকে ধন্যবাদ, এখানে আপনার মা, বোন, আন্টি, প্রতিবেশী, শালী এর সাথে যদি কিছু করার ইচ্ছা থাকে। 
+     এবং করতে পারেন তাহলে সবার সাথে শেয়ার করবেন।এবং কোন পন্থা অবলম্বন করেছেন তাও বলবেন যাতে অন্য 
+     কেউ উপকৃত হয়্ছে।     যেকোনো উপকারী তথ্য, অভিজ্ঞতা বা পরামর্শ শেয়ার করলে সবাই উপকৃত হবে।"""
 )
-
 
 # ---------- helpers ----------
 async def is_admin(update: Update, context: ContextTypes.DEFAULT_TYPE) -> bool:
@@ -76,8 +73,8 @@ async def handle_message(update: Update, context: ContextTypes.DEFAULT_TYPE):
 
 
 # ---------- daily cleanup ----------
-async def daily_cleanup(context: ContextTypes.DEFAULT_TYPE):
-    bot = context.bot
+async def run_cleanup(app):
+    bot = app.bot
 
     for chat_id, msgs in list(MESSAGES.items()):
         if chat_id not in ENABLED_GROUPS:
@@ -98,7 +95,7 @@ async def daily_cleanup(context: ContextTypes.DEFAULT_TYPE):
 
 
 # ---------- main ----------
-async def main():
+def main():
     if not BOT_TOKEN:
         raise RuntimeError("BOT_TOKEN missing")
 
@@ -108,19 +105,19 @@ async def main():
     app.add_handler(CommandHandler("disable_cleanup", disable_cleanup))
     app.add_handler(MessageHandler(filters.ALL, handle_message))
 
-    scheduler = AsyncIOScheduler()
+    # APScheduler (no event loop conflict)
+    scheduler = BackgroundScheduler()
     scheduler.add_job(
-        daily_cleanup,
-        "cron",
+        lambda: app.create_task(run_cleanup(app)),
+        trigger="cron",
         hour=0,
         minute=0,
-        args=[app],
     )
     scheduler.start()
 
     print("🤖 Bot started successfully")
-    await app.run_polling()
+    app.run_polling()
 
 
 if __name__ == "__main__":
-    asyncio.run(main())
+    main()
